@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void parse_file(FILE *f);
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <path>\n", argv[0]);
@@ -13,24 +15,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int pos = 50;
-    char line[4096];
-    int count = 0;
-    char *end;
-    long value;
-    while (fgets(line, sizeof line, f)) {
-        value = strtol(line+1, &end, 10);
-        if (line[0] == 'L') {
-            pos -= value % 100;
-        } else if (line[0] == 'R') {
-            pos += value % 100;
-        }
-        pos %= 100;
-        if (pos == 0) {
-            count += 1;
-        }
-	}
-    printf("%d\n", count);
+    parse_file(f);
+
     if (ferror(f)) {
         perror("read error");
     }
@@ -38,3 +24,31 @@ int main(int argc, char *argv[]) {
     fclose(f);
     return 0;
 }
+
+void parse_file(FILE *f) {
+    int pos = 50;
+    char line[4096];
+    int count1 = 0;
+    int count2 = 0;
+    char *end;
+    long v;
+    while (fgets(line, sizeof line, f)) {
+        v = strtol(line + 1, &end, 10);
+        if (line[0] == 'L') {
+            v = -v;
+        }
+        count2 += labs(v) / 100;
+        v %= 100;
+        if (pos != 0 && (v + pos <= 0 || v + pos >= 100)) {
+            count2 += 1;
+        }
+        pos = (pos + v + 100) % 100;
+
+        if (pos == 0) {
+            count1 += 1;
+        }
+    }
+    printf("%d\n", count1);
+    printf("%d\n", count2);
+}
+
