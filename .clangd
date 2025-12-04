@@ -1,2 +1,2 @@
 CompileFlags:
-  Add: [-I., -std=c11, -Wall, -Wextra]
+  Add: [-I., -std=c23, -Wall, -Wextra]
