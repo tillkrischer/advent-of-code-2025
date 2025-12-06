@@ -1,3 +1,5 @@
+#include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 
 void parse_file(FILE *f);
@@ -24,24 +26,24 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-int max_joltage(int *bank, int n) {
-    int max = 0, max2 = 0, max_index = -1;
-    for (int i = 0; i < n-1; i++) {
+uint64_t max_joltage(int *bank, int bank_size, int start, int remaining) {
+    int max = 0, max_index = -1;
+    uint64_t res = 0;
+    for (int i = start; i < bank_size - remaining+1; i++) {
         if (bank[i] > max) {
             max = bank[i];
             max_index = i;
         }
     }
-    for (int i = max_index + 1; i < n; i++) {
-        if (bank[i] > max2) {
-            max2 = bank[i];
-        }
+    res = max * pow(10, remaining - 1);
+    if (remaining > 1) {
+        res += max_joltage(bank, bank_size, max_index + 1, remaining - 1);
     }
-    return max * 10 + max2;
+    return res;
 }
 
 void parse_file(FILE *f) {
-    int count1 = 0;
+    uint64_t count1 = 0, count2 = 0;
     int c = fgetc(f);
     while (c != EOF) {
         int bank[101];
@@ -50,9 +52,10 @@ void parse_file(FILE *f) {
             bank[i++] = c - '0';
             c = fgetc(f);
         }
-        int j = max_joltage(bank, i);
-        count1 += j;
+        count1 += max_joltage(bank, i, 0, 2);
+        count2 += max_joltage(bank, i, 0, 12);
         c = fgetc(f);
     }
-    printf("%d\n", count1);
+    printf("%llu\n", count1);
+    printf("%llu\n", count2);
 }
