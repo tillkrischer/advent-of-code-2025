@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -40,17 +41,54 @@ bool is_fresh(Range *ranges, size_t range_count, uint64_t num) {
     return false;
 }
 
+void dedup_ranges(Range *ranges, size_t range_count) {
+    for (size_t i = 0; i < range_count; i++) {
+        for (size_t j = 0; j < range_count; j++) {
+            if (i == j) {
+                continue;
+            };
+            /**
+             * i:    xxxxxxx
+             * j:       xxxxxxxx
+             */
+            if (ranges[i].start < ranges[j].start &&
+                ranges[i].end >= ranges[j].start &&
+                ranges[i].end <= ranges[j].end) {
+                ranges[i].end = ranges[j].start - 1;
+            }
+
+            /**
+             * i:         xxxx
+             * j:      xxxxxxxxxx
+             */
+            if (ranges[i].start >= ranges[j].start &&
+                ranges[i].end <= ranges[j].end) {
+                ranges[i].start = 0;
+                ranges[i].end = 0;
+            }
+        }
+    }
+}
+
 void parse_file(FILE *f) {
     char line[256];
     Range ranges[200];
     size_t range_count = 0;
     uint64_t start, end, num;
     uint64_t count1 = 0;
+    uint64_t count2 = 0;
     while (fgets(line, sizeof(line), f) && line[0] != '\n') {
         sscanf(line, "%llu-%llu", &start, &end);
         ranges[range_count].start = start;
         ranges[range_count].end = end;
         range_count++;
+    }
+    dedup_ranges(ranges, range_count);
+
+    for (size_t i = 0; i < range_count; i++) {
+        if (ranges[i].start != 0 || ranges[i].end != 0) {
+            count2 += ranges[i].end - ranges[i].start + 1;
+        }
     }
 
     while (fgets(line, sizeof(line), f)) {
@@ -60,4 +98,5 @@ void parse_file(FILE *f) {
         }
     }
     printf("%llu\n", count1);
+    printf("%llu\n", count2);
 }
