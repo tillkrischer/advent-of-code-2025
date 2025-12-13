@@ -1,10 +1,12 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-void parse_file(FILE *f);
+bool parse_file(const char *filename);
+void parse_input(FILE *f);
 void add_splitter(size_t row, size_t col);
 u_int64_t walk(size_t row, size_t col);
 u_int64_t count_visited();
@@ -28,22 +30,18 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    FILE *f = fopen(argv[1], "r");
-    if (!f) {
-        perror("fopen");
+    if (!parse_file(argv[1])) {
         return 1;
     }
 
-    parse_file(f);
-
-    if (ferror(f)) {
-        perror("read error");
+    if (no_rows == 0) {
+        fprintf(stderr, "Error: No data parsed\n");
+        return 1;
     }
-
-    fclose(f);
 
     u_int64_t paths = walk(0, start_particle_pos);
     u_int64_t visited = count_visited();
+
     printf("%llu\n", visited);
     printf("%llu\n", paths);
 
@@ -64,7 +62,7 @@ u_int64_t walk(size_t row, size_t col) {
     for (size_t i = 0; i < current_row->no_splitters; i++) {
         if (current_row->splitters[i] == col) {
             current_row->visited[i] = true;
-            paths += walk(row + 1, col - 1); 
+            paths += walk(row + 1, col - 1);
             paths += walk(row + 1, col + 1);
             dp[row][col] = paths;
             return paths;
@@ -76,12 +74,12 @@ u_int64_t walk(size_t row, size_t col) {
     return paths;
 }
 
-void parse_file(FILE *f) {
+void parse_input(FILE *f) {
     char line[256];
 
     while (fgets(line, sizeof(line), f)) {
         if (no_cols == 0) {
-            no_cols = strlen(line);
+            no_cols = strlen(line) - 1;
         }
         for (size_t i = 0; i < no_cols; i++) {
             if (line[i] == 'S') {
@@ -109,4 +107,23 @@ u_int64_t count_visited() {
         }
     }
     return count;
+}
+
+bool parse_file(const char *filename) {
+    FILE *f = fopen(filename, "r");
+    if (!f) {
+        perror("fopen");
+        return false;
+    }
+
+    parse_input(f);
+
+    if (ferror(f)) {
+        perror("read error");
+        fclose(f);
+        return false;
+    }
+
+    fclose(f);
+    return true;
 }
