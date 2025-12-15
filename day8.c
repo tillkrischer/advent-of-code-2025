@@ -25,6 +25,7 @@ bool parse_file(const char *filename);
 void parse_input(FILE *f);
 int compare_pairs(const void *a, const void *b);
 u_int64_t product_of_largest_set_sizes(UnionFind *uf);
+u_int64_t product_of_x_cords(Pair p);
 
 Pair pairs[1000000];
 size_t no_pairs = 0;
@@ -74,9 +75,23 @@ int main(int argc, char *argv[]) {
     u_int64_t product = product_of_largest_set_sizes(uf);
     printf("Product of sizes of three largest sets: %llu\n", product);
 
+    while (uf_num_sets(uf) > 1) {
+        uf_union(uf, pairs[to_connect].a_index, pairs[to_connect].b_index);
+        to_connect++;
+    }
+
+    printf("All points connected after %zu pairs\n", to_connect);
+
+    u_int64_t product2 = product_of_x_cords(pairs[to_connect - 1]);
+    printf("Product of x coordinates of last connected pair: %llu\n", product2);
+
     uf_free(uf);
 
     return 0;
+}
+
+u_int64_t product_of_x_cords(Pair p) {
+    return (points[p.a_index].x) * (points[p.b_index].x);
 }
 
 u_int64_t product_of_largest_set_sizes(UnionFind *uf) {
