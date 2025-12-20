@@ -11,9 +11,13 @@ all: $(DAYS)
 union_find.o: union_find.c union_find.h
 	$(CC) $(CFLAGS) -c union_find.c -o union_find.o
 
-# Link each day with union_find.o
-$(DAYS): %: %.c union_find.o
-	$(CC) $(CFLAGS) -o $@ $< union_find.o
+# Compile hash_table.o separately
+hash_table.o: hash_table.c hash_table.h
+	$(CC) $(CFLAGS) -c hash_table.c -o hash_table.o
+
+# Link each day with union_find.o and hash_table.o
+$(DAYS): %: %.c union_find.o hash_table.o
+	$(CC) $(CFLAGS) -o $@ $< union_find.o hash_table.o
 
 clean:
-	rm -f $(DAYS) union_find.o
+	rm -f $(DAYS) union_find.o hash_table.o
