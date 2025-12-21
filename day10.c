@@ -27,18 +27,20 @@ bool parse_file(const char *filename);
 void print_machine(const Machine *m);
 int solve(Machine *m, bool joltage);
 Matrix *setup_eqs(Machine *m, bool joltage);
-void row_echelon_form(Matrix *m, size_t max_cols);
+void row_echelon_form(Matrix *m, size_t max_cols, bool additive);
 void get_pivots(const Matrix *m, size_t *pivots, size_t *num_pivots,
                 size_t *free_col, size_t *num_free_col);
 Matrix *coeff_matrix(Matrix *m, size_t *free_vars, size_t num_free_vars,
-                     size_t num_pivots);
-int get_max_possible_presses(Machine *m, size_t button_index);
+                     size_t num_pivots, bool joltage);
+int get_max_possible_presses(Machine *m, size_t button_index, bool joltage);
 Vector **get_free_variable_vectors(Machine *m, size_t *free_vars,
-                                   size_t num_free_vars, size_t *out_size);
+                                   size_t num_free_vars, size_t *out_size,
+                                   bool joltage);
 void get_combs(CombsData *data, int *stack, size_t height);
 int is_near_integer(double value);
 int is_non_negative_within_epsilon(double value);
 bool check_solution(Vector *sol);
+Vector *matrix_multiply_vector_binary(const Matrix *m, const Vector *v);
 
 Machine machines[200];
 int no_machines = 0;
@@ -53,57 +55,29 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // for (int i = 0; i < no_machines; i++) {
-    //     print_machine(&machines[i]);
-    // }
-
-
-    // printf("Solving machine %d for joltage levels:\n", 4);
-    // int presses = solve(&machines[4], true);
-    // printf("Minimum button presses: %d\n", presses);
-    
     int sum1 = 0;
     int sum2 = 0;
     int presses;
     for (int i = 0; i < no_machines; i++) {
-        // printf("Solving machine %d for indicator lights:\n", i);
-        // solve(&machines[i], false);
-        // printf("Solving machine %d for joltage levels:\n", i);
+        printf("Solving machine %d for indicator lights:\n", i);
+        presses = solve(&machines[i], false);
+        sum1 += presses;
+        printf("Minimum button presses: %d\n", presses);
+        printf("Solving machine %d for joltage levels:\n", i);
         presses = solve(&machines[i], true);
         sum2 += presses;
-        // printf("Minimum button presses: %d\n", presses);
+        printf("Minimum button presses: %d\n", presses);
     }
+    printf("Sum of minimum button presses for indicator lights: %d\n", sum1);
     printf("Sum of minimum button presses for joltage levels: %d\n", sum2);
 
     return 0;
 }
 
-// void tester(int** combinations, int* comb_index, int *values, int depth) {
-//     if (depth == 3) {
-//         combinations[*comb_index] = malloc(3 * sizeof(int));
-//         for (int i = 0; i < 3; i++) {
-//             combinations[*comb_index][i] = values[i];
-//         }
-//         (*comb_index)++;
-//         return;
-//     }
-//
-//     for (int i = 0; i < 5; i++) {
-//         values[depth] = i;
-//         tester(combinations, comb_index, values, depth + 1);
-//     }
-// }
-
 int solve(Machine *m, bool joltage) {
     Matrix *eq_matrix = setup_eqs(m, joltage);
 
-    // printf("\n");
-    // matrix_print(eq_matrix);
-
-    row_echelon_form(eq_matrix, eq_matrix->cols - 1);
-
-    // printf("\n");
-    // matrix_print(eq_matrix);
+    row_echelon_form(eq_matrix, eq_matrix->cols - 1, joltage);
 
     size_t pivots[10];
     size_t num_pivots;
@@ -111,34 +85,22 @@ int solve(Machine *m, bool joltage) {
     size_t num_free_vars = 0;
     get_pivots(eq_matrix, pivots, &num_pivots, free_vars, &num_free_vars);
 
-    // printf("Pivots at columns: ");
-    // for (size_t i = 0; i < num_pivots; i++) {
-    //     printf("%zu ", pivots[i]);
-    // }
-    // printf("\n\n");
-    //
-    // printf("Free variables at columns: ");
-    // for (size_t i = 0; i < num_free_vars; i++) {
-    //     printf("%zu ", free_vars[i]);
-    // }
-    // printf("\n\n");
-
     Matrix *coeffs =
-        coeff_matrix(eq_matrix, free_vars, num_free_vars, num_pivots);
-
-    // printf("Coefficient matrix:\n");
-    // matrix_print(coeffs);
+        coeff_matrix(eq_matrix, free_vars, num_free_vars, num_pivots, joltage);
 
     size_t num_vectors;
-    Vector **free_var_vectors =
-        get_free_variable_vectors(m, free_vars, num_free_vars, &num_vectors);
+    Vector **free_var_vectors = get_free_variable_vectors(
+        m, free_vars, num_free_vars, &num_vectors, joltage);
 
     int min_presses = INT_MAX;
     for (size_t i = 0; i < num_vectors; i++) {
-        Vector *solution = matrix_multiply_vector(coeffs, free_var_vectors[i]);
-
-        // printf("Solution %zu:\n", i + 1);
-        // vector_print(solution);
+        Vector *solution;
+        if (joltage) {
+            solution = matrix_multiply_vector(coeffs, free_var_vectors[i]);
+        } else {
+            solution =
+                matrix_multiply_vector_binary(coeffs, free_var_vectors[i]);
+        }
 
         if (check_solution(solution)) {
             int sum = 0;
@@ -164,6 +126,24 @@ int solve(Machine *m, bool joltage) {
     return min_presses;
 }
 
+Vector *matrix_multiply_vector_binary(const Matrix *m, const Vector *v) {
+    assert(m != NULL && "Matrix cannot be NULL");
+    assert(v != NULL && "Vector cannot be NULL");
+    assert(m->cols == v->size && "Matrix columns must equal vector size");
+
+    Vector *result = vector_create(m->rows);
+    for (size_t i = 0; i < m->rows; i++) {
+        double sum = 0.0;
+
+        for (size_t j = 0; j < m->cols; j++) {
+            sum = (int)sum ^ (int)(m->data[i][j] * v->data[j]);
+        }
+
+        result->data[i] = sum;
+    }
+    return result;
+}
+
 bool check_solution(Vector *sol) {
     for (size_t i = 0; i < sol->size; i++) {
         double val = vector_get(sol, i);
@@ -182,11 +162,12 @@ int is_near_integer(double value) {
 int is_non_negative_within_epsilon(double value) { return value >= -1e-6; }
 
 Vector **get_free_variable_vectors(Machine *m, size_t *free_vars,
-                                   size_t num_free_vars, size_t *out_size) {
+                                   size_t num_free_vars, size_t *out_size,
+                                   bool joltage) {
     int max_presses[3] = {0};
     for (size_t i = 0; i < num_free_vars; i++) {
         size_t button_index = free_vars[i];
-        max_presses[i] = get_max_possible_presses(m, button_index);
+        max_presses[i] = get_max_possible_presses(m, button_index, joltage);
     }
     size_t total_combinations = 1;
     for (size_t i = 0; i < num_free_vars; i++) {
@@ -206,11 +187,6 @@ Vector **get_free_variable_vectors(Machine *m, size_t *free_vars,
     int stack[3] = {0};
     int stack_height = 0;
     get_combs(&data, stack, stack_height);
-
-    // for (size_t i = 0; i < comb_index; i++) {
-    //     vector_print(vectors[i]);
-    // }
-
     return vectors;
 }
 
@@ -235,7 +211,10 @@ void get_combs(CombsData *data, int *stack, size_t height) {
     }
 }
 
-int get_max_possible_presses(Machine *m, size_t button_index) {
+int get_max_possible_presses(Machine *m, size_t button_index, bool joltage) {
+    if (!joltage) {
+        return 1;
+    }
     int max_presses = INT_MAX;
     for (int i = 0; i < 10; i++) {
         if (m->buttons[button_index][i] != 0) {
@@ -249,7 +228,7 @@ int get_max_possible_presses(Machine *m, size_t button_index) {
 }
 
 Matrix *coeff_matrix(Matrix *m, size_t *free_vars, size_t num_free_vars,
-                     size_t num_pivots) {
+                     size_t num_pivots, bool joltage) {
     Matrix *coeffs =
         matrix_create(num_free_vars + num_pivots, num_free_vars + 1);
 
@@ -260,7 +239,10 @@ Matrix *coeff_matrix(Matrix *m, size_t *free_vars, size_t num_free_vars,
     for (size_t i = 0; i < num_pivots; i++) {
         for (size_t j = 0; j < num_free_vars; j++) {
             size_t free_var_col = free_vars[j];
-            double val = -matrix_get(m, i, free_var_col);
+            double val = matrix_get(m, i, free_var_col);
+            if (joltage) {
+                val = -val;
+            }
             matrix_set(coeffs, num_free_vars + i, j, val);
         }
         double const_term = matrix_get(m, i, m->cols - 1);
@@ -294,7 +276,7 @@ void get_pivots(const Matrix *m, size_t *pivots, size_t *num_pivots,
     free(is_pivot_column);
 }
 
-void row_echelon_form(Matrix *m, size_t max_cols) {
+void row_echelon_form(Matrix *m, size_t max_cols, bool additive) {
     size_t lead = 0;
     for (size_t r = 0; r < m->rows; r++) {
         if (lead >= max_cols) {
@@ -324,8 +306,15 @@ void row_echelon_form(Matrix *m, size_t max_cols) {
             if (i != r) {
                 double sub = matrix_get(m, i, lead);
                 for (size_t j = 0; j < m->cols; j++) {
-                    matrix_set(m, i, j,
-                               matrix_get(m, i, j) - sub * matrix_get(m, r, j));
+                    double new_value;
+                    if (additive) {
+                        new_value =
+                            matrix_get(m, i, j) - sub * matrix_get(m, r, j);
+                    } else {
+                        new_value = (int)matrix_get(m, i, j) ^
+                                    (int)(sub * matrix_get(m, r, j));
+                    }
+                    matrix_set(m, i, j, new_value);
                 }
             }
         }
