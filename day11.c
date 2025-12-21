@@ -2,21 +2,23 @@
 #include <stdio.h>
 #include <string.h>
 
+#define MAX_DEVICES 1000
+#define MAX_CONNECTIONS 25
+
 typedef struct {
     char key[4];
-    int connections[25];
+    int connections[MAX_CONNECTIONS];
     int num_connections;
 } Device;
 
 bool parse_file(const char *filename);
-void print_devices();
 int get_device_id(char *name);
-long dfs(int device_id, int dac, int fft);
+long dfs(int device_id, bool dac, bool fft);
 
 HashTable *device_ids;
 size_t no_devices = 0;
-Device devices[1000];
-long DP[1000][2][2];
+Device devices[MAX_DEVICES];
+long DP[MAX_DEVICES][2][2];
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -38,24 +40,22 @@ int main(int argc, char *argv[]) {
     printf("Part 1: %ld\n", part1);
     printf("Part 2: %ld\n", part2);
 
+    ht_free(device_ids);
+
     return 0;
 }
 
-long dfs(int device_id, int dac, int fft) {
+long dfs(int device_id, bool dac, bool fft) {
     if (DP[device_id][dac][fft] != -1) {
         return DP[device_id][dac][fft];
     }
     long result = 0;
     Device *d = &devices[device_id];
-    if (strncmp(d->key, "out", 3) == 0 && dac && fft) {
+    if (strcmp(d->key, "out") == 0 && dac && fft) {
         result = 1;
     } else {
-        if (strncmp(d->key, "dac", 3) == 0) {
-            dac = 1;
-        }
-        if (strncmp(d->key, "fft", 3) == 0) {
-            fft = 1;
-        }
+        dac |= strcmp(d->key, "dac") == 0;
+        fft |= strcmp(d->key, "fft") == 0;
         for (int i = 0; i < d->num_connections; i++) {
             int next_id = d->connections[i];
             result += dfs(next_id, dac, fft);
