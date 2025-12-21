@@ -15,9 +15,13 @@ union_find.o: union_find.c union_find.h
 hash_table.o: hash_table.c hash_table.h
 	$(CC) $(CFLAGS) -c hash_table.c -o hash_table.o
 
-# Link each day with union_find.o and hash_table.o
-$(DAYS): %: %.c union_find.o hash_table.o
-	$(CC) $(CFLAGS) -o $@ $< union_find.o hash_table.o
+# Compile matrix.o separately
+matrix.o: matrix.c matrix.h
+	$(CC) $(CFLAGS) -c matrix.c -o matrix.o
+
+# Link each day with union_find.o, hash_table.o, and matrix.o
+$(DAYS): %: %.c union_find.o hash_table.o matrix.o
+	$(CC) $(CFLAGS) -o $@ $< union_find.o hash_table.o matrix.o
 
 clean:
-	rm -f $(DAYS) union_find.o hash_table.o
+	rm -f $(DAYS) union_find.o hash_table.o matrix.o
